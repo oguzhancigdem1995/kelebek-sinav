@@ -531,13 +531,16 @@ class Uygulama(tk.Tk):
         self.log.see("end")
         self.update_idletasks()
 
+    @staticmethod
+    def _ders_ozeti(sinavlar):
+        return " · ".join(f"{'Haz' if s['seviye'] == 'Hazırlık' else s['seviye']}: {s['ders']}" for s in sinavlar)
+
     def yenile_karma(self):
         self.tv_karma.delete(*self.tv_karma.get_children())
         for k, sinavlar in self.proje.oturumlar().items():
             tarih, saat = k.split("|")
             plan = self.proje.oturum_plani(k)
-            ozet = " · ".join(f"{'Haz' if s['seviye'] == 'Hazırlık' else s['seviye']}: {s['ders']}"
-                              for s in sinavlar)
+            ozet = self._ders_ozeti(sinavlar)
             dis = ", ".join(kisa_ad(a) for a in self.proje.haric.get(k, []) if a in self.proje.siniflar)
             if k in self.proje.dagitimlar:
                 sorun = len(self.proje.dogrula(k))
@@ -875,10 +878,11 @@ class Uygulama(tk.Tk):
     def yenile_rapor(self):
         self.lb_rapor.delete(0, "end")
         self._rapor_anahtarlari = []
-        for k in self.proje.oturumlar():
+        for k, sinavlar in self.proje.oturumlar().items():
             if k in self.proje.dagitimlar:
                 self._rapor_anahtarlari.append(k)
-                self.lb_rapor.insert("end", f"  {tarih_yaz(k.split('|')[0])} · {k.split('|')[1]}")
+                self.lb_rapor.insert("end", f"  {tarih_yaz(k.split('|')[0])} · {k.split('|')[1]}   —   "
+                                            f"{self._ders_ozeti(sinavlar)}")
 
     def rapor_klasor_sec(self):
         y = filedialog.askdirectory()
