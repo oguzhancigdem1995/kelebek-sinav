@@ -40,6 +40,7 @@ for ad, m in [('tkinter',tk),('tkinter.ttk',ttk),('tkinter.messagebox',mb),('tki
 tk.filedialog = fd; tk.simpledialog = sd
 
 xls, pdf, cikti = sys.argv[1], sys.argv[2], sys.argv[3]
+os.environ['KELEBEK_VERI'] = os.path.join(cikti, 'veri')
 from kelebek import arayuz
 fd.askopenfilenames = lambda **k: [xls]
 fd.askopenfilename = lambda **k: pdf
@@ -62,8 +63,11 @@ a.cb_oturum.set = lambda v: None
 a.elle_oturum.set(next(iter(a._elle_etiket))); a.elle_oturum_degisti()
 a.tv_elle._secim = ('0',); a.elle_isaretle(); a.tv_elle._secim = ('5',); a.elle_degistir(); a.elle_geri_al()
 a.ara_var.set('AHMET'); a.elle_bul()
-a.proje_kaydet(); a.proje_ac()
+a.otomatik_kaydet(); assert os.path.exists(a.otomatik_dosya); a.yedek_al(); a.yedek_ac = a.yedek_ac
 a.tv_rapor._secim = tuple(list(a.proje.dagitimlar)[:2]); a.r_klasor.set(os.path.join(cikti, 'pdf')); a.rapor_olustur()
+b = arayuz.Uygulama()   # ikinci açılış: otomatik yüklemeli
+assert len(b.proje.siniflar) == 15 and len(b.proje.dagitimlar) == 16, 'otomatik yükleme başarısız'
+print('otomatik yükleme: tamam')
 print('PDF sayısı:', len(glob.glob(os.path.join(cikti, 'pdf', '*.pdf'))))
 print('hata/uyarı mesajları:', [c for c in cagrilar if c[0] in ('showerror',)])
 print('DUMAN TESTİ BAŞARILI')

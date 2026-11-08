@@ -28,6 +28,20 @@ def kisa_ad(anahtar):
     return f"{'Haz' if seviye == 'Hazırlık' else seviye}-{sube}"
 
 
+def veri_klasoru():
+    """Otomatik kaydın tutulduğu klasör (KELEBEK_VERI ortam değişkeniyle değiştirilebilir)."""
+    ozel = os.environ.get("KELEBEK_VERI")
+    if ozel:
+        return ozel
+    if sys.platform.startswith("win"):
+        taban = os.environ.get("APPDATA") or os.path.expanduser("~")
+    elif sys.platform == "darwin":
+        taban = os.path.join(os.path.expanduser("~"), "Library", "Application Support")
+    else:
+        taban = os.path.join(os.path.expanduser("~"), ".local", "share")
+    return os.path.join(taban, "Kelebek")
+
+
 def kisa_tarih(iso):
     """'2026-11-02' -> '2 Kasım Pazartesi'"""
     return " ".join(tarih_yaz(iso).split()[:2] + tarih_yaz(iso).split()[3:])
@@ -75,8 +89,9 @@ class Uygulama(tk.Tk):
         self._sayfa_karma()
         self._sayfa_yerlesim()
         self._sayfa_rapor()
-        self.bind("<Control-s>", lambda _e: self.proje_kaydet())
+        self._kayit_bekliyor = False
         self.protocol("WM_DELETE_WINDOW", self._kapat)
+        self.otomatik_yukle()
         self.yenile_hepsi()
         self.git("siniflar")
 
@@ -151,7 +166,7 @@ class Uygulama(tk.Tk):
             self.nav[ad] = b
         alt = tk.Frame(self.kenar, bg=KENAR)
         alt.pack(side="bottom", fill="x", pady=16)
-        for metin, komut in (("Projeyi kaydet", self.proje_kaydet), ("Proje aç", self.proje_ac)):
+        for metin, komut in (("Yeni proje", self.yeni_proje), ("Yedek al", self.yedek_al), ("Yedek aç", self.yedek_ac)):
             tk.Button(alt, text=metin, anchor="w", bg=KENAR, fg="#9fb0c7", relief="flat", bd=0,
                       activebackground=KENAR_SEC, activeforeground="white", font=(self.aile, 10),
                       padx=20, pady=6, cursor="hand2", command=komut).pack(fill="x")
@@ -214,39 +229,79 @@ class Uygulama(tk.Tk):
             self.yenile_rapor()
 
     # ------------------------------------------------------------------ genel
+    # ------------------------------------------------------------------ otomatik kayıt
+    @property
+    def otomatik_dosya(self):
+        return os.path.join(veri_klasoru(), "proje.kelebek")
+
+    def otomatik_yukle(self):
+        """Program açılırken son çalışmayı kendiliğinden yükler."""
+        yol = self.otomatik_dosya
+        if not os.path.exists(yol):
+            return
+        try:
+            self.proje = cekirdek.Proje.yukle(yol)
+            self.durum.set("Önceki çalışmanız yüklendi.")
+        except Exception:
+            try:
+                os.replace(yol, yol + ".bozuk")
+            except OSError:
+                pass
+            self.proje = cekirdek.Proje()
+
+    def otomatik_kaydet(self):
+        self._kayit_bekliyor = False
+        try:
+            os.makedirs(veri_klasoru(), exist_ok=True)
+            gecici = self.otomatik_dosya + ".tmp"
+            self.proje.kaydet(gecici)
+            os.replace(gecici, self.otomatik_dosya)
+            self.kirli = False
+        except Exception as e:
+            self.durum.set(f"Otomatik kayıt yapılamadı: {e}")
+
     def _degisti(self):
+        """Her değişiklikten kısa süre sonra kendiliğinden kaydeder."""
         self.kirli = True
+        if not self._kayit_bekliyor:
+            self._kayit_bekliyor = True
+            self.after(1500, self.otomatik_kaydet)
 
     def _kapat(self):
-        if self.kirli and messagebox.askyesno("Kaydet", "Değişiklikler kaydedilsin mi?"):
-            if not self.proje_kaydet():
-                return
+        self.otomatik_kaydet()
         self.destroy()
 
-    def proje_kaydet(self, farkli=False):
-        if farkli or not self.yol:
-            yol = filedialog.asksaveasfilename(defaultextension=".kelebek",
-                                               filetypes=[("Kelebek projesi", "*.kelebek")])
-            if not yol:
-                return False
-            self.yol = yol
-        self.proje.kaydet(self.yol)
-        self.kirli = False
-        self.durum.set(f"Kaydedildi: {self.yol}")
-        return True
+    def yedek_al(self):
+        yol = filedialog.asksaveasfilename(defaultextension=".kelebek", initialfile="kelebek-yedek.kelebek",
+                                           filetypes=[("Kelebek yedeği", "*.kelebek")])
+        if yol:
+            self.proje.kaydet(yol)
+            self.durum.set(f"Yedek kaydedildi: {yol}")
 
-    def proje_ac(self):
-        yol = filedialog.askopenfilename(filetypes=[("Kelebek projesi", "*.kelebek"), ("Tümü", "*.*")])
+    def yedek_ac(self):
+        yol = filedialog.askopenfilename(filetypes=[("Kelebek yedeği", "*.kelebek"), ("Tümü", "*.*")])
         if not yol:
+            return
+        if not messagebox.askyesno("Yedek aç", "Mevcut çalışmanızın yerine bu yedek yüklenecek. Devam edilsin mi?"):
             return
         try:
             self.proje = cekirdek.Proje.yukle(yol)
         except Exception as e:
-            messagebox.showerror("Hata", f"Proje açılamadı:\n{e}")
+            messagebox.showerror("Hata", f"Yedek açılamadı:\n{e}")
             return
-        self.yol = yol
-        self.kirli = False
+        self._degisti()
         self.yenile_hepsi()
+        self.durum.set("Yedek yüklendi.")
+
+    def yeni_proje(self):
+        if not messagebox.askyesno("Yeni proje", "Yüklü sınıf listeleri, takvim ve tüm karmalar silinecek. "
+                                                 "Önce 'Yedek al' ile saklayabilirsiniz. Devam edilsin mi?"):
+            return
+        self.proje = cekirdek.Proje()
+        self.geri_al_yigini = []
+        self._degisti()
+        self.yenile_hepsi()
+        self.durum.set("Yeni proje başlatıldı.")
 
     def yenile_hepsi(self):
         self.yenile_siniflar()
