@@ -10,6 +10,7 @@ from tkinter import font as tkfont
 from . import cekirdek, okuma, rapor
 from .okuma import seviye_adi, tarih_yaz
 
+KOK = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VARSAYILAN_RAPOR_KLASORU = os.path.join(os.path.expanduser("~"), "Documents", "KelebekRaporlar")
 
 # Renkler
@@ -42,7 +43,7 @@ def _klasoru_ac(yol):
 class Uygulama(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Kelebek Sınav Dağıtımı")
+        self.title("Kelebek")
         self.geometry("1180x740")
         self.minsize(980, 620)
         self.configure(bg=ARKA)
@@ -52,6 +53,7 @@ class Uygulama(tk.Tk):
         self.isaretli = None
         self.geri_al_yigini = []
         self._stil()
+        self._simge()
         self._iskelet()
         self._sayfa_siniflar()
         self._sayfa_takvim()
@@ -99,14 +101,32 @@ class Uygulama(tk.Tk):
         st.configure("TEntry", padding=5, fieldbackground=KART)
         st.configure("TCombobox", padding=5)
 
+    def _simge(self):
+        """Pencere / görev çubuğu simgesi ve kenar çubuğu logosu."""
+        self.logo = None
+        try:
+            png = os.path.join(KOK, "assets", "kelebek.png")
+            ico = os.path.join(KOK, "assets", "kelebek.ico")
+            tam = tk.PhotoImage(file=png)
+            self.iconphoto(True, tam)
+            self.logo = tam.subsample(10, 10)   # 512 px -> ~51 px
+            if sys.platform.startswith("win") and os.path.exists(ico):
+                self.iconbitmap(ico)
+        except Exception:
+            pass
+
     def _iskelet(self):
         self.kenar = tk.Frame(self, bg=KENAR, width=190)
         self.kenar.pack(side="left", fill="y")
         self.kenar.pack_propagate(False)
-        tk.Label(self.kenar, text="Kelebek", bg=KENAR, fg="white", font=(self.aile, 18, "bold"),
-                 anchor="w").pack(fill="x", padx=20, pady=(24, 0))
-        tk.Label(self.kenar, text="Sınav Dağıtımı", bg=KENAR, fg="#9fb0c7", font=(self.aile, 10),
-                 anchor="w").pack(fill="x", padx=20, pady=(0, 24))
+        baslik = tk.Frame(self.kenar, bg=KENAR)
+        baslik.pack(fill="x", padx=20, pady=(24, 24))
+        if self.logo is not None:
+            tk.Label(baslik, image=self.logo, bg=KENAR).pack(side="left", padx=(0, 10))
+        yazi = tk.Frame(baslik, bg=KENAR)
+        yazi.pack(side="left")
+        tk.Label(yazi, text="Kelebek", bg=KENAR, fg="white", font=(self.aile, 17, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(yazi, text="Sınav yerleşimi", bg=KENAR, fg="#9fb0c7", font=(self.aile, 9), anchor="w").pack(anchor="w")
         self.nav = {}
         for ad, etiket in SAYFALAR:
             b = tk.Button(self.kenar, text=etiket, anchor="w", bg=KENAR, fg="#d7e0ee", relief="flat", bd=0,

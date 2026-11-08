@@ -1,16 +1,16 @@
-# Kelebek Sınav Dağıtımı
+# Kelebek
 
 Sınıf listelerini (e-Okul Excel) ve sınav takvimini (PDF/Excel) okuyup her sınav oturumu için öğrencileri
 salonlara karıştırır; aynı sınıf seviyesindeki öğrenciler yan yana oturmaz. Çıktı iki PDF listesidir.
 
 ## Kurulum
-Elinizde `KelebekSinav_Kurulum.exe` varsa çift tıklayıp sihirbazı izlemeniz yeterlidir; başka hiçbir şey kurmanız gerekmez.
+Elinizde `Kelebek_Kurulum.exe` varsa çift tıklayıp sihirbazı izlemeniz yeterlidir; başka hiçbir şey kurmanız gerekmez.
 
 Kurulum dosyasını üretmek için (bir kez):
 - **GitHub ile (bilgisayara bir şey kurmadan):** bu klasörü bir GitHub deposuna yükleyin, Actions sekmesinden
-  "Setup.exe olustur" akışını çalıştırın, bitince `KelebekSinav_Kurulum` dosyasını indirin.
+  "Setup.exe olustur" akışını çalıştırın, bitince `Kelebek_Kurulum` dosyasını indirin.
 - **Kendi bilgisayarınızda:** Python 3.9+ ve Inno Setup 6 kurun, `setup_olustur.bat` dosyasını çalıştırın.
-  Sonuç `cikti\KelebekSinav_Kurulum.exe` olur.
+  Sonuç `cikti\Kelebek_Kurulum.exe` olur.
 
 Geliştirme amaçlı çalıştırma: `pip install -r requirements.txt` ardından `python kelebek_baslat.py`.
 

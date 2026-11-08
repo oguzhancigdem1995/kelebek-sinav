@@ -24,7 +24,7 @@ class Degisken:
     def set(self, v): self.v = v
 tk = types.ModuleType('tkinter'); ttk = types.ModuleType('tkinter.ttk')
 tk.TclError = type('TclError',(Exception,),{})
-for ad in ['Tk','Toplevel','Menu','Text','Listbox','Frame','Label','Button','Canvas']: setattr(tk, ad, type(ad, (Sahte,), {}))
+for ad in ['Tk','Toplevel','Menu','Text','Listbox','Frame','Label','Button','Canvas','PhotoImage']: setattr(tk, ad, type(ad, (Sahte,), {}))
 for ad in ['StringVar','IntVar','BooleanVar']: setattr(tk, ad, type(ad, (Degisken,), {}))
 for ad in ['Frame','Label','Button','Entry','Checkbutton','Radiobutton','Combobox','Spinbox','Notebook','Treeview','Scrollbar','LabelFrame','Style']:
     setattr(ttk, ad, type(ad, (Sahte,), {}))

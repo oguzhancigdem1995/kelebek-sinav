@@ -17,14 +17,14 @@ jobs:
           python -m pip install -r requirements.txt pyinstaller
       - name: Uygulamayi derle
         run: >
-          pyinstaller --noconfirm --windowed --name KelebekSinav
+          pyinstaller --noconfirm --windowed --name Kelebek --icon assets/kelebek.ico
           --collect-all pdfplumber --collect-all pdfminer --collect-all reportlab
-          --collect-all python_calamine --add-data "fonts;fonts" kelebek_baslat.py
+          --collect-all python_calamine --add-data "fonts;fonts" --add-data "assets;assets" kelebek_baslat.py
       - name: Inno Setup kur ve kurulum sihirbazini olustur
         run: |
           choco install innosetup -y --no-progress
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" kurulum\KelebekSinav.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" kurulum\Kelebek.iss
       - uses: actions/upload-artifact@v4
         with:
-          name: KelebekSinav_Kurulum
-          path: cikti/KelebekSinav_Kurulum.exe
+          name: Kelebek_Kurulum
+          path: cikti/Kelebek_Kurulum.exe
