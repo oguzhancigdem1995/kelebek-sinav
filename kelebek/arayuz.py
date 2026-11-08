@@ -28,6 +28,21 @@ def kisa_ad(anahtar):
     return f"{'Haz' if seviye == 'Hazırlık' else seviye}-{sube}"
 
 
+def kisa_tarih(iso):
+    """'2026-11-02' -> '2 Kasım Pazartesi'"""
+    return " ".join(tarih_yaz(iso).split()[:2] + tarih_yaz(iso).split()[3:])
+
+
+def kisa_ders(ders, n=16):
+    """Tabloya sığacak kısa, okunaklı ders adı: 'SEÇMELİ BİLİŞİM TEKNOLOJİLERİ' -> 'Seç. Bilişim Tekn…'"""
+    ad = rapor.ad_bicimle(ders)
+    for kucuk in (" Ve ", " Ile "):
+        ad = ad.replace(kucuk, " ve ")
+    if ad.startswith("Seçmeli "):
+        ad = "Seç. " + ad[8:]
+    return ad if len(ad) <= n else ad[:n - 1].rstrip() + "…"
+
+
 def _klasoru_ac(yol):
     try:
         if sys.platform.startswith("win"):
@@ -45,7 +60,7 @@ class Uygulama(tk.Tk):
         super().__init__()
         self.title("Kelebek")
         self.geometry("1180x740")
-        self.minsize(980, 620)
+        self.minsize(1080, 640)
         self.configure(bg=ARKA)
         self.proje = cekirdek.Proje()
         self.yol = None
@@ -538,11 +553,15 @@ class Uygulama(tk.Tk):
         self._dugme(c, "Tümünü karıştır", lambda: self.karistir(True))
         self._dugme(c, "Kelebek dışı sınıflar", self.haric_sec)
         self._dugme(c, "Karmayı sil", self.karma_sil)
-        self.tv_karma = self._tablo(f, [("tarih", "Tarih", 190, "w"), ("saat", "Saat", 70, "w"),
-                                        ("dersler", "Sınavlar", 360, "w"), ("dis", "Kelebek dışı", 110, "w"),
-                                        ("salon", "Salon", 60, "center"), ("ogr", "Öğrenci", 70, "center"),
-                                        ("durum", "Durum", 130, "w")], yukseklik=10)
-        self.log = tk.Text(f, height=6, wrap="word", bg=KART, fg=SOLUK, relief="flat", bd=0, padx=10, pady=8,
+        self.tv_karma = self._tablo(f, [("tarih", "Tarih", 170, "w"), ("saat", "Saat", 70, "w"),
+                                        ("sev", "Seviyeler", 170, "w"), ("dis", "Kelebek dışı", 130, "w"),
+                                        ("salon", "Salon", 70, "center"), ("ogr", "Öğrenci", 80, "center"),
+                                        ("durum", "Durum", 150, "w")], yukseklik=10)
+        self.karma_detay = tk.StringVar()
+        ttk.Label(f, textvariable=self.karma_detay, style="Soluk.TLabel", justify="left").pack(
+            anchor="w", padx=28, pady=(0, 6))
+        self.tv_karma.bind("<<TreeviewSelect>>", lambda _e: self._detay_goster(self.tv_karma, self.karma_detay))
+        self.log = tk.Text(f, height=5, wrap="word", bg=KART, fg=SOLUK, relief="flat", bd=0, padx=10, pady=8,
                            font=(self.aile, 9))
         self.log.pack(fill="x", padx=28, pady=(0, 8))
 
@@ -550,6 +569,21 @@ class Uygulama(tk.Tk):
         self.log.insert("end", metin + "\n")
         self.log.see("end")
         self.update_idletasks()
+
+    def _detay_goster(self, tablo, degisken):
+        """Seçili oturumun tüm derslerini (kısaltmasız) tablonun altında gösterir."""
+        secili = tablo.selection()
+        if not secili:
+            degisken.set("")
+        elif len(secili) > 1:
+            degisken.set(f"{len(secili)} oturum seçili")
+        else:
+            k = secili[0]
+            t, saat = k.split("|")
+            satirlar = [f"{tarih_yaz(t)} · {saat}"]
+            for x in self.proje.oturumlar().get(k, []):
+                satirlar.append(f"    {seviye_adi(x['seviye'])}:  {rapor.ad_bicimle(x['ders'])}")
+            degisken.set("\n".join(satirlar))
 
     @staticmethod
     def _ders_ozeti(sinavlar):
@@ -560,7 +594,7 @@ class Uygulama(tk.Tk):
         for k, sinavlar in self.proje.oturumlar().items():
             tarih, saat = k.split("|")
             plan = self.proje.oturum_plani(k)
-            ozet = self._ders_ozeti(sinavlar)
+            ozet = " · ".join("Haz" if x["seviye"] == "Hazırlık" else x["seviye"] for x in sinavlar)
             dis = ", ".join(kisa_ad(a) for a in self.proje.haric.get(k, []) if a in self.proje.siniflar)
             if k in self.proje.dagitimlar:
                 sorun = len(self.proje.dogrula(k))
@@ -568,7 +602,7 @@ class Uygulama(tk.Tk):
             else:
                 durum = "—"
             self.tv_karma.insert("", "end", iid=k, values=(
-                tarih_yaz(tarih), saat, ozet, dis or "—", len(plan["salonlar"]), len(plan["ogrenciler"]), durum))
+                kisa_tarih(tarih), saat, ozet, dis or "—", len(plan["salonlar"]), len(plan["ogrenciler"]), durum))
 
     def haric_sec(self):
         """Seçili oturumlar için kelebek sistemine dahil edilmeyecek sınıfları seçtirir."""
@@ -865,44 +899,44 @@ class Uygulama(tk.Tk):
 
     # ------------------------------------------------------------------ sayfa 5: rapor
     def _sayfa_rapor(self):
-        f = self._sayfa("rapor", "Raporlar", "Seçtiğiniz oturumlar için PDF listeleri oluşturun.")
-        govde = ttk.Frame(f)
-        govde.pack(fill="both", expand=True, padx=28)
-        sol = ttk.Frame(govde)
-        sol.pack(side="left", fill="both", expand=True)
-        ttk.Label(sol, text="Oturumlar (Ctrl/Shift ile çoklu seçim)", style="Soluk.TLabel").pack(anchor="w", pady=(0, 4))
-        cerceve = ttk.Frame(sol)
-        cerceve.pack(fill="both", expand=True)
-        self.lb_rapor = tk.Listbox(cerceve, selectmode="extended", bg=KART, relief="flat", bd=0,
-                                   highlightthickness=0, activestyle="none", selectbackground=VURGU_ACIK,
-                                   selectforeground=YAZI, font=(self.aile, 10))
-        sb = ttk.Scrollbar(cerceve, orient="vertical", command=self.lb_rapor.yview)
-        self.lb_rapor.configure(yscrollcommand=sb.set)
-        self.lb_rapor.pack(side="left", fill="both", expand=True)
-        sb.pack(side="right", fill="y")
-        sag = ttk.Frame(govde)
-        sag.pack(side="left", fill="y", padx=(24, 0))
+        f = self._sayfa("rapor", "Raporlar", "Oturumları seçin (Ctrl/Shift ile çoklu seçim), PDF listelerini oluşturun.")
+        kolonlar = [("tarih", "Tarih", 150, "w"), ("saat", "Saat", 60, "w")]
+        for sev in okuma.SEVIYE_SIRASI:
+            kolonlar.append((f"s{sev}", seviye_adi(sev), 126, "w"))
+        self.tv_rapor = self._tablo(f, kolonlar, yukseklik=11)
+        self.rapor_detay = tk.StringVar()
+        ttk.Label(f, textvariable=self.rapor_detay, style="Soluk.TLabel", justify="left").pack(
+            anchor="w", padx=28, pady=(0, 8))
+        self.tv_rapor.bind("<<TreeviewSelect>>", lambda _e: self._detay_goster(self.tv_rapor, self.rapor_detay))
+        alt = ttk.Frame(f)
+        alt.pack(fill="x", padx=28, pady=(0, 6))
         self.r_liste1, self.r_liste2, self.r_ayri = tk.BooleanVar(value=True), tk.BooleanVar(value=True), tk.BooleanVar(value=True)
-        ttk.Label(sag, text="Listeler", style="Soluk.TLabel").pack(anchor="w", pady=(0, 4))
-        ttk.Checkbutton(sag, text="Liste 1 · Öğrenci bazlı\n(hangi salonda, kaçıncı sırada)", variable=self.r_liste1).pack(anchor="w", pady=3)
-        ttk.Checkbutton(sag, text="Liste 2 · Salon bazlı\n(öğrenciler + seviye özeti)", variable=self.r_liste2).pack(anchor="w", pady=3)
-        ttk.Checkbutton(sag, text="Her oturum ayrı PDF olsun", variable=self.r_ayri).pack(anchor="w", pady=(10, 3))
-        ttk.Label(sag, text="Kayıt klasörü", style="Soluk.TLabel").pack(anchor="w", pady=(16, 4))
+        sol = ttk.Frame(alt)
+        sol.pack(side="left", anchor="n")
+        ttk.Checkbutton(sol, text="Liste 1 · Öğrenci bazlı (hangi salonda, kaçıncı sırada)", variable=self.r_liste1).pack(anchor="w", pady=2)
+        ttk.Checkbutton(sol, text="Liste 2 · Salon bazlı (öğrenciler + seviye özeti)", variable=self.r_liste2).pack(anchor="w", pady=2)
+        ttk.Checkbutton(sol, text="Her oturum ayrı PDF olsun", variable=self.r_ayri).pack(anchor="w", pady=2)
+        sag = ttk.Frame(alt)
+        sag.pack(side="right", anchor="n")
+        ttk.Label(sag, text="Kayıt klasörü", style="Soluk.TLabel").grid(row=0, column=0, sticky="w")
         self.r_klasor = tk.StringVar(value=VARSAYILAN_RAPOR_KLASORU)
-        ttk.Entry(sag, textvariable=self.r_klasor, width=34).pack(anchor="w")
-        ttk.Button(sag, text="Klasör seç", command=self.rapor_klasor_sec).pack(anchor="w", pady=6)
-        ttk.Button(sag, text="PDF oluştur", style="Vurgu.TButton", command=self.rapor_olustur).pack(anchor="w", pady=(16, 0))
+        ttk.Entry(sag, textvariable=self.r_klasor, width=38).grid(row=1, column=0, sticky="w", padx=(0, 8))
+        ttk.Button(sag, text="Klasör seç", command=self.rapor_klasor_sec).grid(row=1, column=1)
+        ttk.Button(sag, text="PDF oluştur", style="Vurgu.TButton", command=self.rapor_olustur).grid(
+            row=1, column=2, padx=(12, 0))
         self.r_sonuc = tk.StringVar()
-        ttk.Label(f, textvariable=self.r_sonuc, style="Soluk.TLabel").pack(anchor="w", padx=28, pady=8)
+        ttk.Label(f, textvariable=self.r_sonuc, style="Soluk.TLabel").pack(anchor="w", padx=28, pady=4)
 
     def yenile_rapor(self):
-        self.lb_rapor.delete(0, "end")
-        self._rapor_anahtarlari = []
+        self.tv_rapor.delete(*self.tv_rapor.get_children())
         for k, sinavlar in self.proje.oturumlar().items():
-            if k in self.proje.dagitimlar:
-                self._rapor_anahtarlari.append(k)
-                self.lb_rapor.insert("end", f"  {tarih_yaz(k.split('|')[0])} · {k.split('|')[1]}   —   "
-                                            f"{self._ders_ozeti(sinavlar)}")
+            if k not in self.proje.dagitimlar:
+                continue
+            tarih, saat = k.split("|")
+            ders = {x["seviye"]: kisa_ders(x["ders"]) for x in sinavlar}
+            self.tv_rapor.insert("", "end", iid=k, values=[kisa_tarih(tarih), saat] + [
+                ders.get(sev, "—") for sev in okuma.SEVIYE_SIRASI])
+        self.rapor_detay.set("")
 
     def rapor_klasor_sec(self):
         y = filedialog.askdirectory()
@@ -910,7 +944,7 @@ class Uygulama(tk.Tk):
             self.r_klasor.set(y)
 
     def rapor_olustur(self):
-        secili = [self._rapor_anahtarlari[i] for i in self.lb_rapor.curselection()]
+        secili = sorted(self.tv_rapor.selection(), key=cekirdek.oturum_sirasi)
         if not secili:
             messagebox.showinfo("Seçim yok", "Listeden en az bir oturum seçin.")
             return
