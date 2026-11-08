@@ -1,0 +1,30 @@
+name: Setup.exe olustur
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+jobs:
+  setup:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Paketleri kur
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Uygulamayi derle
+        run: >
+          pyinstaller --noconfirm --windowed --name KelebekSinav
+          --collect-all pdfplumber --collect-all pdfminer --collect-all reportlab
+          --collect-all python_calamine --add-data "fonts;fonts" kelebek_baslat.py
+      - name: Inno Setup kur ve kurulum sihirbazini olustur
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" kurulum\KelebekSinav.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KelebekSinav_Kurulum
+          path: cikti/KelebekSinav_Kurulum.exe
