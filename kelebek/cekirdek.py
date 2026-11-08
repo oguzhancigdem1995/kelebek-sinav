@@ -52,6 +52,7 @@ class Proje:
         self.ayni_ders = {}     # "oturum|ders" -> "serbest" | "ayri"
         self.dagitimlar = {}    # oturum anahtarı -> {"tohum", "yerlesim", "salonlar"}
         self.haric = {}         # oturum anahtarı -> kelebek dışı bırakılan sınıf anahtarları
+        self.kurum = {"alt_baslik": "", "mudur": "", "mudur_yrd": "", "logo": "", "rapor_klasoru": ""}
 
     # ------------------------------------------------------------ sınıflar
     def siniflari_ekle(self, okunan):
@@ -230,7 +231,7 @@ class Proje:
         veri = {"okul_adi": self.okul_adi, "takvim_basligi": self.takvim_basligi,
                 "siniflar": list(self.siniflar.values()), "sinavlar": self.sinavlar,
                 "ayni_ders": self.ayni_ders, "dagitimlar": self.dagitimlar,
-                "haric": self.haric}
+                "haric": self.haric, "kurum": self.kurum}
         with open(yol, "w", encoding="utf-8") as f:
             json.dump(veri, f, ensure_ascii=False, indent=1)
 
@@ -246,6 +247,7 @@ class Proje:
         p.ayni_ders = v.get("ayni_ders", {})
         p.dagitimlar = v.get("dagitimlar", {})
         p.haric = v.get("haric", {})
+        p.kurum.update(v.get("kurum", {}))
         eski = [a for a, s in p.siniflar.items() if s.pop("haric", False)]  # eski sürüm: genel hariç listesi
         if eski:
             for k in p.oturumlar():

@@ -1,4 +1,6 @@
 """PDF raporları: Liste 1 (öğrenci bazlı) ve Liste 2 (salon bazlı + seviye özeti). Modern, sade tasarım."""
+import base64
+import io
 import os
 import sys
 from collections import Counter
@@ -7,9 +9,10 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer,
+from reportlab.platypus import (Image, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer,
                                 Table, TableStyle)
 
 from .okuma import seviye_adi, seviye_sirala_anahtari, tarih_yaz
@@ -93,7 +96,14 @@ def _escape(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _belge(yol, baslik, okul):
+def _belge(yol, baslik, proje):
+    okul = (proje.okul_adi or "").strip()
+    imzalar = []
+    if (proje.kurum.get("mudur_yrd") or "").strip():
+        imzalar.append(f"Müdür Yardımcısı: {proje.kurum['mudur_yrd'].strip()}")
+    if (proje.kurum.get("mudur") or "").strip():
+        imzalar.append(f"Okul Müdürü: {proje.kurum['mudur'].strip()}")
+
     def sayfa(canvas, doc):
         canvas.saveState()
         w, h = A4
@@ -104,13 +114,15 @@ def _belge(yol, baslik, okul):
         canvas.line(16 * mm, 13 * mm, w - 16 * mm, 13 * mm)
         canvas.setFont(FONT_L, 7.5)
         canvas.setFillColor(SOLUK)
-        canvas.drawString(16 * mm, 8.5 * mm, (okul or "").strip())
+        canvas.drawString(16 * mm, 8.5 * mm, okul)
+        if imzalar:
+            canvas.drawCentredString(w * 0.62, 8.5 * mm, "   ·   ".join(imzalar))
         canvas.drawRightString(w - 16 * mm, 8.5 * mm, f"Sayfa {doc.page}")
         canvas.restoreState()
 
     belge = SimpleDocTemplate(yol, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm,
                               topMargin=14 * mm, bottomMargin=18 * mm, title=baslik,
-                              author="Kelebek Sınav Dağıtımı")
+                              author="Kelebek")
     return belge, sayfa
 
 
@@ -138,14 +150,41 @@ def _kartlar(kartlar):
     return t
 
 
+def _logo(proje, kutu=20 * mm):
+    """Kurum logosunu (data URL) en-boy oranı korunarak bir Image olarak döndürür; yoksa None."""
+    veri = (proje.kurum.get("logo") or "")
+    if "," not in veri:
+        return None
+    try:
+        ham = base64.b64decode(veri.split(",", 1)[1])
+        gw, gh = ImageReader(io.BytesIO(ham)).getSize()
+        oran = min(kutu / gw, kutu / gh)
+        img = Image(io.BytesIO(ham), width=gw * oran, height=gh * oran)
+        img.hAlign = "RIGHT"
+        return img
+    except Exception:
+        return None
+
+
 def _ust(proje, etiket, buyuk, kartlar):
-    return [Paragraph(f'<font name="{FONT_B}" size="8" color="#2f6fed">{_escape(etiket.upper())}</font>',
-                      _stil("e", leading=10)),
-            Spacer(1, 1.5 * mm),
-            Paragraph(_escape(buyuk), _stil("b", fontName=FONT_B, fontSize=24, leading=28)),
-            Paragraph(_escape((proje.okul_adi or "").strip()), _stil("o", fontName=FONT_L, fontSize=8.5,
-                                                                    textColor=SOLUK, leading=11)),
-            Spacer(1, 4.5 * mm), _kartlar(kartlar), Spacer(1, 6 * mm)]
+    alt = " · ".join(x for x in ((proje.kurum.get("alt_baslik") or "").strip(),
+                                 (proje.takvim_basligi or "").strip()) if x)
+    sol = [Paragraph(f'<font name="{FONT_B}" size="8" color="#2f6fed">{_escape(etiket.upper())}</font>',
+                     _stil("e", leading=10)),
+           Spacer(1, 1.5 * mm),
+           Paragraph(_escape(buyuk), _stil("b", fontName=FONT_B, fontSize=24, leading=28)),
+           Paragraph(_escape((proje.okul_adi or "").strip()), _stil("o", fontName=FONT_L, fontSize=8.5,
+                                                                   textColor=SOLUK, leading=11))]
+    if alt:
+        sol.append(Paragraph(_escape(alt), _stil("a", fontName=FONT_L, fontSize=7.5, textColor=SOLUK, leading=10)))
+    logo = _logo(proje)
+    if logo is not None:
+        ust = Table([[sol, logo]], colWidths=[GENISLIK - 26 * mm, 26 * mm])
+        ust.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                 ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        sol = [ust]
+    return sol + [Spacer(1, 4.5 * mm), _kartlar(kartlar), Spacer(1, 6 * mm)]
 
 
 def _tablo(basliklar, satirlar, genislikler, seviyeler, hizalar=None, vurgu_sutunlari=()):
@@ -157,7 +196,7 @@ def _tablo(basliklar, satirlar, genislikler, seviyeler, hizalar=None, vurgu_sutu
         veri.append([""] + satir)
     t = Table(veri, colWidths=[2 * mm] + genislikler, repeatRows=1)
     stil = [("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 3.1), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.1),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.7), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.7),
             ("LEFTPADDING", (1, 0), (-1, -1), 6), ("RIGHTPADDING", (1, 0), (-1, -1), 4),
             ("LEFTPADDING", (0, 0), (0, -1), 0), ("RIGHTPADDING", (0, 0), (0, -1), 0),
             ("LINEBELOW", (0, 0), (-1, 0), 0.9, MUREKKEP),
@@ -223,7 +262,7 @@ def liste1_pdf(proje, oturumlar, yol):
     if not ogeler:
         raise ValueError("Raporlanacak karma sonucu yok.")
     ogeler.pop()
-    belge, sayfa = _belge(yol, "Öğrenci Sınav Yerleri", proje.okul_adi)
+    belge, sayfa = _belge(yol, "Öğrenci Sınav Yerleri", proje)
     belge.build(ogeler, onFirstPage=sayfa, onLaterPages=sayfa)
 
 
@@ -307,7 +346,7 @@ def liste2_pdf(proje, oturumlar, yol):
     if not ogeler:
         raise ValueError("Raporlanacak karma sonucu yok.")
     ogeler.pop()
-    belge, sayfa = _belge(yol, "Salon Sınav Listeleri", proje.okul_adi)
+    belge, sayfa = _belge(yol, "Salon Sınav Listeleri", proje)
     belge.build(ogeler, onFirstPage=sayfa, onLaterPages=sayfa)
 
 

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kelebek</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="uygulama">
+  <aside class="yan">
+    <div class="marka"><i></i>Kelebek</div>
+    <nav id="menu">
+      <button data-sayfa="kurum">Kurum</button>
+      <button data-sayfa="siniflar">Sınıflar</button>
+      <button data-sayfa="takvim">Takvim</button>
+      <button data-sayfa="karma">Karma</button>
+      <button data-sayfa="yerlesim">Yerleşim</button>
+      <button data-sayfa="raporlar">Raporlar</button>
+    </nav>
+    <div class="yan-alt" id="yan-alt">Otomatik kaydedilir</div>
+  </aside>
+  <main id="icerik"></main>
+</div>
+<div id="modal-kap" class="modal-kap" hidden></div>
+<div id="toast-kap"></div>
+<script src="app.js"></script>
+</body>
+</html>

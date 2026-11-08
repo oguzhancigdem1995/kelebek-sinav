@@ -19,7 +19,22 @@ jobs:
         run: >
           pyinstaller --noconfirm --windowed --name Kelebek --icon assets/kelebek.ico
           --collect-all pdfplumber --collect-all pdfminer --collect-all reportlab
-          --collect-all python_calamine --add-data "fonts;fonts" --add-data "assets;assets" kelebek_baslat.py
+          --collect-all python_calamine --collect-all webview --collect-all clr_loader --collect-all pythonnet
+          --add-data "fonts;fonts" --add-data "assets;assets" --add-data "web;web" kelebek_baslat.py
+      - name: Derlenen uygulamayi ac ve ozeti dene (WebView2 + arayuz)
+        shell: pwsh
+        run: |
+          $sonuc = Join-Path $env:RUNNER_TEMP "selftest.txt"
+          $env:KELEBEK_SELFTEST_DOSYA = $sonuc
+          $p = Start-Process -FilePath "dist\Kelebek\Kelebek.exe" -ArgumentList "--selftest" -PassThru
+          $p.WaitForExit(120000) | Out-Null
+          if (-not $p.HasExited) { $p.Kill() }
+          if (Test-Path $sonuc) { $m = Get-Content $sonuc -Raw } else { $m = "KELEBEK-SELFTEST HATA sonuc dosyasi olusmadi" }
+          Write-Host $m
+          if ($m -notmatch "SELFTEST OK") { Write-Host "::error::$m"; exit 1 }
+      - name: WebView2 kurucusunu indir
+        shell: pwsh
+        run: Invoke-WebRequest "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile kurulum\MicrosoftEdgeWebview2Setup.exe
       - name: Inno Setup kur ve kurulum sihirbazini olustur
         run: |
           choco install innosetup -y --no-progress
